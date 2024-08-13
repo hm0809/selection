@@ -22,5 +22,5 @@ This model simulates a population of creatures, represented as dots. They have v
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/hm0809/selection
+   git clone https://github.com/hm0809/selection.git
    cd selection
