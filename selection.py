@@ -5,7 +5,7 @@ import time
 
 pygame.init()
 
-WIDTH, HEIGHT = 800, 600
+WIDTH, HEIGHT = 1680, 890
 PADDING = 50  #Padding around the simulation box
 screen = pygame.display.set_mode((WIDTH + PADDING * 2, HEIGHT + PADDING * 2))
 pygame.display.set_caption("Creature Simulation")
@@ -16,7 +16,7 @@ GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 GREY = (50, 50, 50)
 
-font = pygame.font.SysFont(None, 24)
+font = pygame.font.SysFont(None, 21)
 font2 = pygame.font.SysFont(None, 14)
 
 #Can toggle, so all of to start
@@ -32,7 +32,7 @@ damage_value = 30 / 60
 
 class Creature:
     def __init__(self, health=None, speed=None, direction_bias_x=None, direction_bias_y=None):
-        self.radius = 5
+        self.radius = 12
         self.x = random.randint(self.radius, WIDTH - self.radius) + PADDING
         self.y = random.randint(self.radius, HEIGHT - self.radius) + PADDING
 
@@ -42,7 +42,7 @@ class Creature:
         self.speed = speed if speed is not None else random.uniform(1.5, 3.2) * 2
         self.direction_bias_x = direction_bias_x if direction_bias_x is not None else random.uniform(-0.3, 0.3)
         self.direction_bias_y = direction_bias_y if direction_bias_y is not None else random.uniform(-0.3, 0.3)
-        self.radius *= ((self.initial_health-100)/100) + 1
+        self.radius = max(1, ((self.health - 90) / 100) + 5)
 
         #Random initial direction
         angle = random.uniform(0, 2 * math.pi)
@@ -63,15 +63,21 @@ class Creature:
         new_x = self.x + self.dx
         new_y = self.y + self.dy
 
-        if self.radius + PADDING <= new_x <= WIDTH + PADDING - self.radius:
-            self.x = new_x
-        if self.radius + PADDING <= new_y <= HEIGHT + PADDING - self.radius:
-            self.y = new_y
+        if new_x <= self.radius + PADDING or new_x >= WIDTH + PADDING - self.radius:
+            self.dx = -self.dx
+
+        if new_y <= self.radius + PADDING or new_y >= HEIGHT + PADDING - self.radius:
+            self.dy = -self.dy
+
+
+        self.x += self.dx
+        self.y += self.dy
 
         #Damage urself
         self.apply_damage()
 
     def apply_damage(self):
+
         if self.x < WIDTH / 2 + PADDING and self.y < HEIGHT / 2 + PADDING:
             self.health -= damage_quartiles["top_left"]
         elif self.x >= WIDTH / 2 + PADDING and self.y < HEIGHT / 2 + PADDING:
@@ -81,26 +87,39 @@ class Creature:
         elif self.x >= WIDTH / 2 + PADDING and self.y >= HEIGHT / 2 + PADDING:
             self.health -= damage_quartiles["bottom_right"]
 
+        self.radius = max(1, ((self.health - 1) / 90) * 7 + 10)
+
+        health_clamped = max(0, min(self.health, 100))
+
+        #Gradient for health
+        green_value = int((health_clamped / 100) * 255)
+        red_value = 255 - green_value
+        self.color = (red_value, green_value, 0)
+
+        
+
     def draw(self, screen):
-        pygame.draw.circle(screen, GREEN, (int(self.x), int(self.y)), self.radius)
+        pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
         #Display the creature's properties
+        """"
         text = font2.render(
             f"h: {int(self.health)} s: {round(self.speed, 2)} bx: {round(self.direction_bias_x, 2)} by: {round(self.direction_bias_y, 2)}",
             True,
             WHITE,
         )
         screen.blit(text, (self.x - self.radius, self.y - self.radius - 20))
+        """
 
 
 #Calculate average values on call, so it doesn't happen 60*8 times every generation lmao
-def calculate_averages(creatures, calculate):
+def calculate_averages(creatures, calculate, mutations):
     if creatures and calculate:
         avg_health = sum([creature.initial_health for creature in creatures]) / len(creatures)
         avg_speed = sum([creature.speed for creature in creatures]) / len(creatures)
         avg_bias_x = sum([creature.direction_bias_x for creature in creatures]) / len(creatures)
         avg_bias_y = sum([creature.direction_bias_y for creature in creatures]) / len(creatures)
         alive = len(creatures)
-    return [avg_health, avg_speed, avg_bias_x, avg_bias_y, alive]
+    return [avg_health, avg_speed, avg_bias_x, avg_bias_y, alive, mutations]
 
 
 def display_averages(creatures, screen, avg_list, write_to_file):
@@ -109,13 +128,15 @@ def display_averages(creatures, screen, avg_list, write_to_file):
     avg_bias_x = avg_list[2]
     avg_bias_y = avg_list[3]
     alive = avg_list[4]
-
+    mutations = avg_list[5]
+    
     if creatures:
         avg_text = font.render(
-            f"Avg Health: {round(avg_health, 2)}  Avg Speed: {round(avg_speed, 2)}  Avg Bias X: {round(avg_bias_x, 2)}  Avg Bias Y: {round(avg_bias_y, 2)}  Alive: {alive}",
+            f"Avg Health: {round(avg_health, 2)}  Avg Speed: {round(avg_speed, 2)}  Avg Bias X: {round(avg_bias_x, 2)}  Avg Bias Y: {round(avg_bias_y, 2)}  Alive: {alive} Mutations: {mutations}",
             True,
             WHITE,
         )
+    
         screen.blit(avg_text, (PADDING, HEIGHT + PADDING + 10))
     if write_to_file:
         with open("generation_values.txt", "a") as file:
@@ -154,19 +175,54 @@ def toggle_damage(x, y):
         damage_quartiles["bottom_right"] = damage_value if damage_quartiles["bottom_right"] == 0 else 0
 
 def main():
+    MUTATION_RATE = 0.1
+    global mutations
+    mutations = 0
     with open("generation_values.txt", "a") as file:
         file.write("NEW SIM \n\n\n\n\n\n\n")
     clock = pygame.time.Clock()
-    initial_population_size = 30
+    initial_population_size = 100
     creatures = [Creature() for _ in range(initial_population_size)]  
 
     start_time = time.time()
     generation = 1
 
     running = True
-    avg_list = calculate_averages(creatures, True)
+    avg_list = calculate_averages(creatures, True, mutations)
 
     display_averages(creatures, screen, avg_list, True)
+
+    def mutate_trait(trait, trait_name):
+        RELATIVE_STRENGTH = {
+            "health": 0.2,
+            "speed": 0.15,
+            "direction_bias_x": 0.12,
+            "direction_bias_y": 0.12 
+        }
+        if random.random() < MUTATION_RATE:
+            #Apply mutation depending on strength and property
+            mutation_strength = RELATIVE_STRENGTH[trait_name]
+            mutation_factor = 1 + random.uniform(-mutation_strength, mutation_strength)
+            global mutations
+            mutations += 1
+            return trait * mutation_factor
+        return trait
+    
+    def reproduce(parent1, parent2):
+        # Offspring inherits traits from parents with possible mutations
+        health = mutate_trait(random.choice([parent1.initial_health, parent2.initial_health]), "health")
+        speed = mutate_trait(random.choice([parent1.speed, parent2.speed]), "speed")
+        direction_bias_x = mutate_trait(random.choice([parent1.direction_bias_x, parent2.direction_bias_x]), "direction_bias_x")
+        direction_bias_y = mutate_trait(random.choice([parent1.direction_bias_y, parent2.direction_bias_y]), "direction_bias_y")
+
+        return Creature(
+            health=health,
+            speed=speed,
+            direction_bias_x=direction_bias_x,
+            direction_bias_y=direction_bias_y
+        )
+
+
     while running:
         screen.fill(BLACK)
 
@@ -203,15 +259,11 @@ def main():
             creatures_temp = []
             for i in range(initial_population_size):
                 parent1, parent2 = random.sample(creatures, 2)
-                offspring = Creature(
-                    health=random.choice([parent1.initial_health, parent2.initial_health]),  
-                    speed=random.choice([parent1.speed, parent2.speed]),
-                    direction_bias_x=random.choice([parent1.direction_bias_x, parent2.direction_bias_x]),
-                    direction_bias_y=random.choice([parent1.direction_bias_y, parent2.direction_bias_y]),
-                )
+                offspring = reproduce(parent1, parent2)
                 creatures_temp.append(offspring)
             creatures = creatures_temp
-            avg_list = calculate_averages(creatures, True)
+            
+            avg_list = calculate_averages(creatures, True, mutations)
             display_averages(creatures, screen, avg_list, True)
 
             generation += 1
