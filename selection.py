@@ -42,6 +42,7 @@ class Creature:
         self.speed = speed if speed is not None else random.uniform(1.5, 3.2) * 2
         self.direction_bias_x = direction_bias_x if direction_bias_x is not None else random.uniform(-0.3, 0.3)
         self.direction_bias_y = direction_bias_y if direction_bias_y is not None else random.uniform(-0.3, 0.3)
+        self.radius *= ((self.initial_health-100)/100) + 1
 
         #Random initial direction
         angle = random.uniform(0, 2 * math.pi)
