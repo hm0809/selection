@@ -27,6 +27,13 @@ damage_quartiles = {
     "bottom_right": 0,
 }
 
+food_density = {
+    "x": 0,
+    "y": 0,
+    "spread": 0
+
+}
+
 #Damage amount, adjusting for frame rate of 60
 damage_value = 30 / 60
 
@@ -100,17 +107,18 @@ class Creature:
 
     def draw(self, screen):
         pygame.draw.circle(screen, self.color, (int(self.x), int(self.y)), self.radius)
-        #Display the creature's properties
-        """"
+        """" Commented out, could be a useful debugging tool though, as it shows all the properties of individual creatures
         text = font2.render(
             f"h: {int(self.health)} s: {round(self.speed, 2)} bx: {round(self.direction_bias_x, 2)} by: {round(self.direction_bias_y, 2)}",
             True,
             WHITE,
         )
-        screen.blit(text, (self.x - self.radius, self.y - self.radius - 20))
+        screen.blit(text, (self.x - self.radius, self.y - self.radius - 20)) 
         """
 
-
+class Food:
+    def __init__(self):
+        pass
 #Calculate average values on call, so it doesn't happen 60*8 times every generation lmao
 def calculate_averages(creatures, calculate, mutations):
     if creatures and calculate:
